@@ -119,7 +119,7 @@
       });
 
       const getTreeData = computed((): TreeItem[] =>
-        searchState.startSearch ? searchState.searchData : unref(treeDataRef)
+        searchState.startSearch ? searchState.searchData : unref(treeDataRef),
       );
 
       const getNotFound = computed((): boolean => {
@@ -211,16 +211,32 @@
           searchState.startSearch = false;
           return;
         }
+        const { filterFn, checkable, expandOnSearch, checkOnSearch } = unref(props);
         searchState.startSearch = true;
-        const { title: titleField } = unref(getReplaceFields);
+        const { title: titleField, key: keyField } = unref(getReplaceFields);
 
+        const searchKeys: string[] = [];
         searchState.searchData = filter(
           unref(treeDataRef),
           (node) => {
-            return node[titleField]?.includes(searchValue) ?? false;
+            const result = filterFn
+              ? filterFn(searchValue, node, unref(getReplaceFields))
+              : node[titleField]?.includes(searchValue) ?? false;
+            if (result) {
+              searchKeys.push(node[keyField]);
+            }
+            return result;
           },
-          unref(getReplaceFields)
+          unref(getReplaceFields),
         );
+
+        if (expandOnSearch && searchKeys.length > 0) {
+          setExpandedKeys(searchKeys);
+        }
+
+        if (checkOnSearch && checkable && searchKeys.length > 0) {
+          setCheckedKeys(searchKeys);
+        }
       }
 
       function handleClickNode(key: string, children: TreeItem[]) {
@@ -239,6 +255,7 @@
 
       watchEffect(() => {
         treeDataRef.value = props.treeData as TreeItem[];
+        handleSearch(unref(searchText));
       });
 
       onMounted(() => {
@@ -266,7 +283,7 @@
         () => props.value,
         () => {
           state.checkedKeys = toRaw(props.value || []);
-        }
+        },
       );
 
       watch(
@@ -275,7 +292,7 @@
           const v = toRaw(state.checkedKeys);
           emit('update:value', v);
           emit('change', v);
-        }
+        },
       );
 
       // watchEffect(() => {
